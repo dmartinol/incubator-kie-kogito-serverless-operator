@@ -144,10 +144,10 @@ func Test_newDevProfile(t *testing.T) {
 
 	propCM := &corev1.ConfigMap{}
 	_ = client.Get(context.TODO(), types.NamespacedName{Namespace: workflow.Namespace, Name: workflowproj.GetWorkflowPropertiesConfigMapName(workflow)}, propCM)
-	assert.NotEmpty(t, propCM.Data[workflowproj.ApplicationPropertiesFileName])
+	assert.Empty(t, propCM.Data[workflowproj.ApplicationPropertiesFileName])
 	assert.Equal(t, quarkusDevConfigMountPath, deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath)
 	assert.Equal(t, "", deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].SubPath) //https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
-	assert.Contains(t, propCM.Data[workflowproj.ApplicationPropertiesFileName], "quarkus.http.port")
+	assert.NotContains(t, propCM.Data[workflowproj.ApplicationPropertiesFileName], "quarkus.http.port")
 
 	service := test.MustGetService(t, client, workflow)
 	assert.Equal(t, int32(constants.DefaultHTTPWorkflowPortInt), service.Spec.Ports[0].TargetPort.IntVal)
@@ -178,8 +178,8 @@ func Test_newDevProfile(t *testing.T) {
 
 	propCM = &corev1.ConfigMap{}
 	_ = client.Get(context.TODO(), types.NamespacedName{Namespace: workflow.Namespace, Name: workflowproj.GetWorkflowPropertiesConfigMapName(workflow)}, propCM)
-	assert.NotEmpty(t, propCM.Data[workflowproj.ApplicationPropertiesFileName])
-	assert.Contains(t, propCM.Data[workflowproj.ApplicationPropertiesFileName], "quarkus.http.port")
+	assert.Empty(t, propCM.Data[workflowproj.ApplicationPropertiesFileName])
+	assert.NotContains(t, propCM.Data[workflowproj.ApplicationPropertiesFileName], "quarkus.http.port")
 
 	// reconcile
 	workflow.Status.Manager().MarkTrue(api.RunningConditionType)

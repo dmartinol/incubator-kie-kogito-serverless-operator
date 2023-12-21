@@ -25,6 +25,7 @@ import (
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/api"
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/platform"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
@@ -49,7 +50,7 @@ func (d *deploymentReconciler) reconcile(ctx context.Context, workflow *operator
 
 func (d *deploymentReconciler) reconcileWithBuiltImage(ctx context.Context, workflow *operatorapi.SonataFlow, image string) (reconcile.Result, []client.Object, error) {
 	pl, _ := platform.GetActivePlatform(ctx, d.C, workflow.Namespace)
-	propsCM, _, err := d.ensurers.propertiesConfigMap.Ensure(ctx, workflow, common.WorkflowPropertiesMutateVisitor(ctx, d.StateSupport.Catalog, workflow, pl))
+	propsCM, _, err := d.ensurers.propertiesConfigMap.Ensure(ctx, workflow)
 	if err != nil {
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.ExternalResourcesNotFoundReason, "Unable to retrieve the properties config map")
 		_, err = d.PerformStatusUpdate(ctx, workflow)
@@ -60,7 +61,7 @@ func (d *deploymentReconciler) reconcileWithBuiltImage(ctx context.Context, work
 		d.ensurers.deployment.Ensure(
 			ctx,
 			workflow,
-			d.getDeploymentMutateVisitors(workflow, image, propsCM.(*v1.ConfigMap))...,
+			d.getDeploymentMutateVisitors(ctx, d.StateSupport.Catalog, workflow, pl, image, propsCM.(*v1.ConfigMap))...,
 		)
 	if err != nil {
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.DeploymentUnavailableReason, "Unable to perform the deploy due to ", err)
@@ -98,14 +99,15 @@ func (d *deploymentReconciler) reconcileWithBuiltImage(ctx context.Context, work
 }
 
 func (d *deploymentReconciler) getDeploymentMutateVisitors(
-	workflow *operatorapi.SonataFlow,
+	ctx context.Context, catalog discovery.ServiceCatalog, workflow *operatorapi.SonataFlow, platform *operatorapi.SonataFlowPlatform,
 	image string,
 	configMap *v1.ConfigMap) []common.MutateVisitor {
 	if utils.IsOpenShift() {
 		return []common.MutateVisitor{common.DeploymentMutateVisitor(workflow),
 			mountProdConfigMapsMutateVisitor(configMap),
 			addOpenShiftImageTriggerDeploymentMutateVisitor(workflow, image),
-			common.ImageDeploymentMutateVisitor(workflow, image)}
+			common.ImageDeploymentMutateVisitor(workflow, image),
+			common.WorkflowPropertiesMutateVisitor(ctx, catalog, workflow, platform, configMap)}
 	}
 	return []common.MutateVisitor{common.DeploymentMutateVisitor(workflow),
 		common.ImageDeploymentMutateVisitor(workflow, image),

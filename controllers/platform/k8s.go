@@ -74,7 +74,7 @@ func (action *serviceAction) Handle(ctx context.Context, platform *operatorapi.S
 }
 
 func createServiceComponents(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
-	if err := createConfigMap(ctx, client, platform, ps); err != nil {
+	if err := createServiceConfigMap(ctx, client, platform, ps); err != nil {
 		return err
 	}
 	if err := createDeployment(ctx, client, platform, ps); err != nil {
@@ -229,7 +229,7 @@ func createService(ctx context.Context, client client.Client, platform *operator
 	return nil
 }
 
-func createConfigMap(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
+func createServiceConfigMap(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
 	handler, err := properties.NewServiceAppPropertyHandler(platform, ps)
 	if err != nil {
 		return err
@@ -243,7 +243,7 @@ func createConfigMap(ctx context.Context, client client.Client, platform *operat
 			},
 		},
 		Data: map[string]string{
-			workflowproj.ApplicationPropertiesFileName: handler.Build(),
+			workflowproj.ApplicationPropertiesFileName: handler.BuildImmutableProperties(),
 		},
 	}
 	if err := controllerutil.SetControllerReference(platform, configMap, client.Scheme()); err != nil {
@@ -252,7 +252,7 @@ func createConfigMap(ctx context.Context, client client.Client, platform *operat
 
 	// Create or Update the service
 	if op, err := controllerutil.CreateOrUpdate(ctx, client, configMap, func() error {
-		configMap.Data[workflowproj.ApplicationPropertiesFileName] = handler.WithUserProperties(configMap.Data[workflowproj.ApplicationPropertiesFileName]).Build()
+		configMap.Data[workflowproj.ApplicationPropertiesFileName] = handler.WithUserProperties(configMap.Data[workflowproj.ApplicationPropertiesFileName]).BuildImmutableProperties()
 
 		return nil
 	}); err != nil {

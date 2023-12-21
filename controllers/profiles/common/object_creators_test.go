@@ -38,6 +38,8 @@ import (
 )
 
 func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
+	//TODO all test of deployment env vars
+
 	workflow := test.GetBaseSonataFlowWithDevProfile(t.Name())
 	// can't be new
 	cm, _ := WorkflowPropsConfigMapCreator(workflow)
@@ -45,28 +47,31 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 	cm.SetResourceVersion("1")
 	reflectCm := cm.(*corev1.ConfigMap)
 
-	visitor := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil)
-	mutateFn := visitor(cm)
+	object, err := DeploymentCreator(workflow)
+	assert.NoError(t, err)
+
+	deployment := object.(*appsv1.Deployment)
+
+	visitor := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil, reflectCm)
+	mutateFn := visitor(deployment)
 
 	assert.NoError(t, mutateFn())
-	assert.NotEmpty(t, reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
-
-	props := properties.MustLoadString(reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
-	assert.Equal(t, "8080", props.GetString("quarkus.http.port", ""))
+	assert.Empty(t, reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
 
 	// we change the properties to something different, we add ours and change the default
 	reflectCm.Data[workflowproj.ApplicationPropertiesFileName] = "quarkus.http.port=9090\nmy.new.prop=1"
-	visitor(reflectCm)
+	visitor(deployment)
 	assert.NoError(t, mutateFn())
 
-	// we should preserve the default, and still got ours
-	props = properties.MustLoadString(reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
-	assert.Equal(t, "8080", props.GetString("quarkus.http.port", ""))
-	assert.Equal(t, "0.0.0.0", props.GetString("quarkus.http.host", ""))
+	// we should preserve ours
+	props := properties.MustLoadString(reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
+	assert.Equal(t, 2, len(props.Keys()))
+	assert.Equal(t, "9090", props.GetString("quarkus.http.port", ""))
 	assert.Equal(t, "1", props.GetString("my.new.prop", ""))
 }
 
 func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.T) {
+	//TODO all test of deployment env vars
 	workflow := test.GetBaseSonataFlowWithDevProfile(t.Name())
 	existingCM := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -78,14 +83,20 @@ func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.
 			workflowproj.ApplicationPropertiesFileName: "mp.messaging.outgoing.kogito_outgoing_stream.url=${kubernetes:services.v1/event-listener}",
 		},
 	}
-	mutateVisitorFn := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil)
+	mutateVisitorFn := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil, existingCM)
 
-	err := mutateVisitorFn(existingCM)()
+	object, err := DeploymentCreator(workflow)
+	assert.NoError(t, err)
+
+	deployment := object.(*appsv1.Deployment)
+
+	err = mutateVisitorFn(deployment)()
 	assert.NoError(t, err)
 	assert.Contains(t, existingCM.Data[workflowproj.ApplicationPropertiesFileName], "${kubernetes:services.v1/event-listener}")
 }
 
 func TestMergePodSpec(t *testing.T) {
+	//TODO all test of deployment env vars
 	workflow := test.GetBaseSonataFlow(t.Name())
 	workflow.Spec.PodTemplate = v1alpha08.PodTemplateSpec{
 		Container: v1alpha08.ContainerSpec{

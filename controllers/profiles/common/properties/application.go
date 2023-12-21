@@ -32,6 +32,7 @@ import (
 
 	"github.com/magiconair/properties"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
@@ -40,6 +41,7 @@ import (
 
 const (
 	discoveryLikePropertyPattern = "^\\${(kubernetes|knative|openshift):(.*)}$"
+	nonAlphaNumericCharsPattern  = "[^a-zA-Z0-9]+"
 )
 
 var (
@@ -51,6 +53,7 @@ var (
 		"quarkus.devservices.enabled=false\n"+
 		"quarkus.kogito.devservices.enabled=false\n", constants.DefaultHTTPWorkflowPortInt)
 
+	nonAlphaNumericChars                         = regexp.MustCompile(nonAlphaNumericCharsPattern)
 	discoveryLikePropertyExpr                    = regexp.MustCompile(discoveryLikePropertyPattern)
 	_                         AppPropertyHandler = &appPropertyHandler{}
 )
@@ -58,7 +61,7 @@ var (
 type AppPropertyHandler interface {
 	WithUserProperties(userProperties string) AppPropertyHandler
 	WithServiceDiscovery(ctx context.Context, catalog discovery.ServiceCatalog) AppPropertyHandler
-	Build() string
+	BuildImmutableProperties() string
 }
 
 type appPropertyHandler struct {
@@ -82,7 +85,8 @@ func (a *appPropertyHandler) WithServiceDiscovery(ctx context.Context, catalog d
 	return a
 }
 
-func (a *appPropertyHandler) Build() string {
+func (a *appPropertyHandler) BuildImmutableProperties() string {
+	immutableProps := properties.NewProperties()
 	var props *properties.Properties
 	var propErr error = nil
 	if len(a.userProperties) == 0 {
@@ -108,7 +112,7 @@ func (a *appPropertyHandler) Build() string {
 		// produce the MicroProfileConfigServiceCatalog properties for the service discovery property values if any.
 		discoveryProperties := generateDiscoveryProperties(a.ctx, a.catalog, props, a.workflow)
 		if discoveryProperties.Len() > 0 {
-			props.Merge(discoveryProperties)
+			immutableProps.Merge(discoveryProperties)
 		}
 	}
 
@@ -119,12 +123,12 @@ func (a *appPropertyHandler) Build() string {
 		}
 	}
 	// overwrite with the default mutable properties provided by the operator that are not set by the user.
-	props.Merge(defaultMutableProps)
+	immutableProps.Merge(defaultMutableProps)
 	defaultImmutableProps := properties.MustLoadString(immutableApplicationProperties)
 	// finally overwrite with the defaults immutable properties.
-	props.Merge(defaultImmutableProps)
-	props.Sort()
-	return props.String()
+	immutableProps.Merge(defaultImmutableProps)
+	immutableProps.Sort()
+	return immutableProps.String()
 }
 
 // withKogitoServiceUrl adds the property kogitoServiceUrlProperty to the application properties.
@@ -206,7 +210,7 @@ func ImmutableApplicationProperties(workflow *operatorapi.SonataFlow, platform *
 	if err != nil {
 		return "", err
 	}
-	return p.Build(), nil
+	return p.BuildImmutableProperties(), nil
 
 }
 
@@ -278,4 +282,20 @@ func generateMicroprofileServiceCatalogProperty(serviceUri string) string {
 
 func escapeValue(unescaped string, value string) string {
 	return strings.Replace(unescaped, value, fmt.Sprintf("\\%s", value), -1)
+}
+
+func toEnvVarName(property string) string {
+	return strings.ToUpper(nonAlphaNumericChars.ReplaceAllString(property, "_"))
+}
+
+func ToContainerEnvVars(containerProps string) []v1.EnvVar {
+	envVars := []v1.EnvVar{}
+	props, _ := properties.LoadString(containerProps)
+	for _, k := range props.Keys() {
+		varName := toEnvVarName(k)
+		value := props.GetString(k, "")
+		envVars = append(envVars, v1.EnvVar{Name: varName, Value: value})
+		klog.V(log.I).Infof("Adding env var %s as %s", varName, value)
+	}
+	return envVars
 }

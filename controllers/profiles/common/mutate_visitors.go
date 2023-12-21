@@ -24,9 +24,11 @@ import (
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/properties"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -104,14 +106,15 @@ func ServiceMutateVisitor(workflow *operatorapi.SonataFlow) MutateVisitor {
 }
 
 func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.ServiceCatalog,
-	workflow *operatorapi.SonataFlow, platform *operatorapi.SonataFlowPlatform) MutateVisitor {
+	workflow *operatorapi.SonataFlow, platform *operatorapi.SonataFlowPlatform, cm *corev1.ConfigMap) MutateVisitor {
 	return func(object client.Object) controllerutil.MutateFn {
 		return func() error {
 			if kubeutil.IsObjectNew(object) {
 				return nil
 			}
-			cm := object.(*corev1.ConfigMap)
-			cm.Labels = workflow.GetLabels()
+			// TODO review the mutator
+			deployment := object.(*appsv1.Deployment)
+			deployment.Labels = workflow.GetLabels()
 			_, hasKey := cm.Data[workflowproj.ApplicationPropertiesFileName]
 			if !hasKey {
 				cm.Data = make(map[string]string, 1)
@@ -128,9 +131,17 @@ func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.Serv
 			if err != nil {
 				return err
 			}
-			cm.Data[workflowproj.ApplicationPropertiesFileName] = props.WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
+			immutableProperties := props.WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
 				WithServiceDiscovery(ctx, catalog).
-				Build()
+				BuildImmutableProperties()
+
+			// TODO add envVars to Deployment
+			envVars := properties.ToContainerEnvVars(immutableProperties)
+			klog.V(log.I).Infof("envVars: %s", envVars)
+
+			// TODO create Warning event if the SonataFlow instance includes any variable under
+			// .spec.podTemplate.container.env that tries to override these variables
+
 			return nil
 		}
 	}
