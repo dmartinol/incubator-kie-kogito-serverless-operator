@@ -22,9 +22,10 @@ package properties
 import (
 	"context"
 	"fmt"
-
 	"regexp"
 	"strings"
+
+	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/platform/services"
@@ -71,7 +72,6 @@ type appPropertyHandler struct {
 	ctx                      context.Context
 	userProperties           string
 	defaultMutableProperties *properties.Properties
-	isService                bool
 }
 
 func (a *appPropertyHandler) WithUserProperties(properties string) AppPropertyHandler {
@@ -95,12 +95,7 @@ func (a *appPropertyHandler) BuildImmutableProperties() string {
 		props, propErr = properties.LoadString(a.userProperties)
 	}
 	if propErr != nil {
-		// can't load user's properties, ignore it
-		if a.isService && a.platform != nil {
-			klog.V(log.D).InfoS("Can't load user's property", "platform", a.platform.Name, "namespace", a.platform.Namespace, "properties", a.userProperties)
-		} else {
-			klog.V(log.D).InfoS("Can't load user's property", "workflow", a.workflow.Name, "namespace", a.workflow.Namespace, "properties", a.userProperties)
-		}
+		klog.V(log.D).InfoS("Can't load user's property", "workflow", a.workflow.Name, "namespace", a.workflow.Namespace, "properties", a.userProperties)
 		props = properties.NewProperties()
 	}
 	// Disable expansions since it's not our responsibility
@@ -115,6 +110,13 @@ func (a *appPropertyHandler) BuildImmutableProperties() string {
 			immutableProps.Merge(discoveryProperties)
 		}
 	}
+	props = utils.NewApplicationPropertiesBuilder().
+		WithInitialProperties(props).
+		WithImmutableProperties(properties.MustLoadString(immutableApplicationProperties)).
+		WithDefaultMutableProperties(a.defaultMutableProperties).
+		Build()
+
+	return props.String()
 
 	defaultMutableProps := a.defaultMutableProperties
 	for _, k := range defaultMutableProps.Keys() {
@@ -158,9 +160,15 @@ func (a *appPropertyHandler) addDefaultMutableProperty(name string, value string
 	return a
 }
 
-// NewAppPropertyHandler creates the default workflow configurations property handler
-// The set of properties is initialized with the operator provided immutable properties.
-// The set of defaultMutableProperties is initialized with the operator provided properties that the user might override.
+// NewAppPropertyHandler creates a property handler for a given workflow to execute in the provided platform.
+// This handler is intended to build the application properties required by the workflow to execute properly, note that
+// the produced properties might vary depending on the platfom, for example, if the job service managed by the platform
+// a particular set of properties will be added, etc.
+// By default, the following properties are incorporated:
+// The set of immutable properties provided by the operator. (user can never change)
+// The set of defaultMutableProperties that are provided by the operator, and that the user might overwrite if it changes
+// the workflow ConfigMap. This set includes for example the required properties to connect with the data index and the
+// job service when any of these services are managed by the platform.
 func NewAppPropertyHandler(workflow *operatorapi.SonataFlow, platform *operatorapi.SonataFlowPlatform) (AppPropertyHandler, error) {
 	handler := &appPropertyHandler{
 		workflow: workflow,
@@ -185,22 +193,6 @@ func NewAppPropertyHandler(workflow *operatorapi.SonataFlow, platform *operatora
 	}
 	handler.defaultMutableProperties = props
 	return handler.withKogitoServiceUrl(), nil
-}
-
-// NewServicePropertyHandler creates the default service configurations property handler
-// The set of properties is initialized with the operator provided immutable properties.
-// The set of defaultMutableProperties is initialized with the operator provided properties that the user might override.
-func NewServiceAppPropertyHandler(platform *operatorapi.SonataFlowPlatform, ps services.Platform) (AppPropertyHandler, error) {
-	handler := &appPropertyHandler{
-		platform:  platform,
-		isService: true,
-	}
-	props, err := ps.GenerateServiceProperties()
-	if err != nil {
-		return nil, err
-	}
-	handler.defaultMutableProperties = props
-	return handler, nil
 }
 
 // ImmutableApplicationProperties immutable default application properties that can be used with any workflow based on Quarkus.

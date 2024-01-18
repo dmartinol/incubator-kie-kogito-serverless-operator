@@ -1,16 +1,21 @@
-// Copyright 2023 Apache Software Foundation (ASF)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package platform
 
@@ -22,7 +27,6 @@ import (
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/platform/services"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/properties"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/workflowproj"
@@ -131,12 +135,10 @@ func createDeployment(ctx context.Context, client client.Client, platform *opera
 	dataDeployContainer.Name = ps.GetContainerName()
 
 	replicas := ps.GetReplicaCount()
-	lbl := map[string]string{
-		workflowproj.LabelApp: platform.Name,
-	}
+	lbl, selectorLbl := getLabels(platform, ps)
 	dataDeploySpec := appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
-			MatchLabels: lbl,
+			MatchLabels: selectorLbl,
 		},
 		Replicas: &replicas,
 		Template: corev1.PodTemplateSpec{
@@ -191,9 +193,7 @@ func createDeployment(ctx context.Context, client client.Client, platform *opera
 }
 
 func createService(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
-	lbl := map[string]string{
-		workflowproj.LabelApp: platform.Name,
-	}
+	lbl, selectorLbl := getLabels(platform, ps)
 	dataSvcSpec := corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{
 			{
@@ -203,7 +203,7 @@ func createService(ctx context.Context, client client.Client, platform *operator
 				TargetPort: common.DefaultHTTPWorkflowPortIntStr,
 			},
 		},
-		Selector: lbl,
+		Selector: selectorLbl,
 	}
 	dataSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -229,18 +229,28 @@ func createService(ctx context.Context, client client.Client, platform *operator
 	return nil
 }
 
-func createServiceConfigMap(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
-	handler, err := properties.NewServiceAppPropertyHandler(platform, ps)
+func getLabels(platform *operatorapi.SonataFlowPlatform, ps services.Platform) (map[string]string, map[string]string) {
+	lbl := map[string]string{
+		workflowproj.LabelApp:     platform.Name,
+		workflowproj.LabelService: ps.GetServiceName(),
+	}
+	selectorLbl := map[string]string{
+		workflowproj.LabelService: ps.GetServiceName(),
+	}
+	return lbl, selectorLbl
+}
+
+func createConfigMap(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
+	handler, err := services.NewServiceAppPropertyHandler(ps)
 	if err != nil {
 		return err
 	}
+	lbl, _ := getLabels(platform, ps)
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ps.GetServiceCmName(),
 			Namespace: platform.Namespace,
-			Labels: map[string]string{
-				workflowproj.LabelApp: platform.Name,
-			},
+			Labels:    lbl,
 		},
 		Data: map[string]string{
 			workflowproj.ApplicationPropertiesFileName: handler.BuildImmutableProperties(),
