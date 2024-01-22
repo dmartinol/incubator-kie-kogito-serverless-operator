@@ -30,7 +30,6 @@ import (
 	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/platform/services"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
 
 	"github.com/magiconair/properties"
@@ -51,13 +50,13 @@ const (
 	myService3Address = "http://10.110.90.3:80"
 
 	myKnService1        = "my-kn-service1"
-	myKnService1Address = "http://my-kn-sevice1.namespace1.svc.cluster.local"
+	myKnService1Address = "http://my-kn-service1.namespace1.svc.cluster.local"
 
 	myKnService2        = "my-kn-service2"
-	myKnService2Address = "http://my-kn-sevice2.namespace1.svc.cluster.local"
+	myKnService2Address = "http://my-kn-service2.namespace1.svc.cluster.local"
 
 	myKnService3        = "my-kn-service3"
-	myKnService3Address = "http://my-kn-sevice3.default-namespace.svc.cluster.local"
+	myKnService3Address = "http://my-kn-service3.default-namespace.svc.cluster.local"
 
 	myKnBroker1        = "my-kn-broker1"
 	myKnBroker1Address = "http://broker-ingress.knative-eventing.svc.cluster.local/namespace1/my-kn-broker1"
@@ -160,13 +159,13 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 		BuildImmutableProperties())
 	generatedProps.DisableExpansion = true
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 21, len(generatedProps.Keys()))
+	assert.Equal(t, 16, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
 
 	assertDoesntHaveProperty(t, generatedProps, "service1")
 	assertDoesntHaveProperty(t, generatedProps, "service2")
-	assertHasProperty(t, generatedProps, "service3", "${knative:namespace1/my-kn-service1}")
+	assertDoesntHaveProperty(t, generatedProps, "service3")
 
 	//org.kie.kogito.addons.discovery.kubernetes\:services.v1\/usecase1º/my-service1 below we use the unescaped vale because the properties.LoadString removes them.
 	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.kubernetes:services.v1/namespace1/my-service1", myService1Address)
@@ -200,32 +199,6 @@ func assertDoesntHaveProperty(t *testing.T, props *properties.Properties, expect
 	assert.False(t, ok, "Property %s, is present as not expected.", expectedProperty)
 }
 
-func Test_generateMicroprofileServiceCatalogProperty(t *testing.T) {
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:services.v1/namespace1/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:services.v1\\/namespace1\\/financial-service")
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:services.v1/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:services.v1\\/financial-service")
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:pods.v1/namespace1/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:pods.v1\\/namespace1\\/financial-service")
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:pods.v1/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:pods.v1\\/financial-service")
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:deployments.v1.apps/namespace1/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:deployments.v1.apps\\/namespace1\\/financial-service")
-
-	doTestGenerateMicroprofileServiceCatalogProperty(t, "kubernetes:deployments.v1.apps/financial-service",
-		"org.kie.kogito.addons.discovery.kubernetes\\:deployments.v1.apps\\/financial-service")
-}
-
-func doTestGenerateMicroprofileServiceCatalogProperty(t *testing.T, serviceUri string, expectedProperty string) {
-	mpProperty := generateMicroprofileServiceCatalogProperty(serviceUri)
-	assert.Equal(t, mpProperty, expectedProperty, "expected microprofile service catalog property for serviceUri: %s, is %s, but the returned value was: %s", serviceUri, expectedProperty, mpProperty)
-}
-
 func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	//try to override kogito.service.url and quarkus.http.port
 	userProperties := "property1=value1\nproperty2=value2\nquarkus.http.port=9090\nkogito.service.url=http://myUrl.override.com\nquarkus.http.port=9090"
@@ -250,12 +223,12 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 11, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
 
 	//kogito.service.url is missing as it takes the user provided value.
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	//quarkus.http.port remains with the default value since it's immutable.
 	assert.Equal(t, "8080", generatedProps.GetString("quarkus.http.port", ""))
 	assert.Equal(t, "0.0.0.0", generatedProps.GetString("quarkus.http.host", ""))
@@ -274,10 +247,10 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 12, len(generatedProps.Keys()))
+	assert.Equal(t, 13, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.DataIndexServiceName+"."+platform.Namespace+"/processes", generatedProps.GetString(constants.DataIndexServiceURLProperty, ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace+"/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceDataSourceReactiveURL, ""))
@@ -290,26 +263,26 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 11, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.DataIndexServiceURLProperty, ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace+"/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEvents, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEventsURL, ""))
 
-	// check that service app properties are being properly set
-	js := services.NewJobService(platform)
-	p, err := NewServiceAppPropertyHandler(platform, js)
+	// disabling data index bypasses config of outgoing events url
+	platform.Spec.Services.DataIndex.Enabled = nil
+	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(p.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 6, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
-	assert.Equal(t, "false", generatedProps.GetString(constants.JobServiceKafkaSmallRyeHealthProperty, ""))
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
+	assertDoesntHaveProperty(t, generatedProps, constants.JobServiceKafkaSmallRyeHealthProperty)
 	//quarkus.http.port remains with the default value since it's immutable.
 	assert.Equal(t, "8080", generatedProps.GetString("quarkus.http.port", ""))
 
@@ -319,10 +292,10 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 11, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.DataIndexServiceURLProperty, ""))
 	assert.Equal(t, "http://localhost/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceDataSourceReactiveURL, ""))
@@ -344,10 +317,10 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 11, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.DataIndexServiceURLProperty, ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace+"/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEvents, ""))
@@ -366,10 +339,10 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 11, len(generatedProps.Keys()))
+	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
 	assertDoesntHaveProperty(t, generatedProps, "property2")
-	assertDoesntHaveProperty(t, generatedProps, "kogito.service.url")
+	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.DataIndexServiceURLProperty, ""))
 	assert.Equal(t, "http://sonataflow-platform-jobs-service.default/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEvents, ""))

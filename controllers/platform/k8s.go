@@ -78,7 +78,7 @@ func (action *serviceAction) Handle(ctx context.Context, platform *operatorapi.S
 }
 
 func createServiceComponents(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, ps services.Platform) error {
-	if err := createServiceConfigMap(ctx, client, platform, ps); err != nil {
+	if err := createConfigMap(ctx, client, platform, ps); err != nil {
 		return err
 	}
 	if err := createDeployment(ctx, client, platform, ps); err != nil {

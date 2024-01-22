@@ -206,5 +206,5 @@ func OpenShiftRouteCreator(workflow *operatorapi.SonataFlow) (client.Object, err
 
 // WorkflowPropsConfigMapCreator creates a ConfigMap to hold the external application properties
 func WorkflowPropsConfigMapCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
-	return workflowproj.CreateNewAppPropsConfigMap(workflow, ""), nil
+	return workflowproj.CreateEmptyAppPropsConfigMap(workflow), nil
 }

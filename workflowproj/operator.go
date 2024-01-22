@@ -92,6 +92,18 @@ func CreateNewAppPropsConfigMap(workflow *operatorapi.SonataFlow, properties str
 	}
 }
 
+// CreateEmptyAppPropsConfigMap creates an empty ConfigMap object to hold the workflow application properties.
+func CreateEmptyAppPropsConfigMap(workflow *operatorapi.SonataFlow) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetWorkflowPropertiesConfigMapName(workflow),
+			Namespace: workflow.Namespace,
+			Labels:    GetDefaultLabels(workflow),
+		},
+		Data: map[string]string{ApplicationPropertiesFileName: ""},
+	}
+}
+
 // SetWorkflowProfile adds the profile annotation to the workflow
 func SetWorkflowProfile(workflow *operatorapi.SonataFlow, profile metadata.ProfileType) {
 	if workflow.Annotations == nil {

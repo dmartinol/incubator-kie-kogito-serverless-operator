@@ -63,7 +63,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 	visitor(deployment)
 	assert.NoError(t, mutateFn())
 
-	// we should preserve ours
+	// we should preserve our propss
 	props := properties.MustLoadString(reflectCm.Data[workflowproj.ApplicationPropertiesFileName])
 	assert.Equal(t, 2, len(props.Keys()))
 	assert.Equal(t, "9090", props.GetString("quarkus.http.port", ""))
