@@ -134,7 +134,7 @@ func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.Serv
 			}
 			immutableProperties := props.WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
 				WithServiceDiscovery(ctx, catalog).
-				BuildImmutableProperties()
+				Build()
 
 			// TODO add envVars to Deployment
 			envVars := properties.ToContainerEnvVars(immutableProperties)

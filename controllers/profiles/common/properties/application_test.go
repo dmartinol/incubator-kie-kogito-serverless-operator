@@ -122,7 +122,7 @@ func Test_appPropertyHandler_WithUserPropertiesWithNoUserOverrides(t *testing.T)
 	workflow := test.GetBaseSonataFlow("default")
 	props, err := NewAppPropertyHandler(workflow, nil)
 	assert.NoError(t, err)
-	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 9, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -156,7 +156,7 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 	generatedProps, propsErr := properties.LoadString(props.
 		WithUserProperties(userProperties).
 		WithServiceDiscovery(context.TODO(), &mockCatalogService{}).
-		BuildImmutableProperties())
+		Build())
 	generatedProps.DisableExpansion = true
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 16, len(generatedProps.Keys()))
@@ -221,7 +221,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 
 	props, err := NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -245,7 +245,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	workflow.SetAnnotations(map[string]string{metadata.Profile: string(metadata.ProdProfile)})
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 13, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -261,7 +261,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	platform.Spec.Services.DataIndex.Enabled = nil
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -276,7 +276,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	platform.Spec.Services.DataIndex.Enabled = nil
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -290,7 +290,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	platform.Spec.Services.JobService.Enabled = nil
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -315,7 +315,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	}
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -337,7 +337,7 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	}
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
-	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).BuildImmutableProperties())
+	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
 	assert.Equal(t, 12, len(generatedProps.Keys()))
 	assertDoesntHaveProperty(t, generatedProps, "property1")
@@ -360,7 +360,7 @@ var _ = Describe("Platform properties", func() {
 				func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
 					handler, err := NewAppPropertyHandler(wf, plfm)
 					Expect(err).NotTo(HaveOccurred())
-					p, err := properties.LoadString(handler.BuildImmutableProperties())
+					p, err := properties.LoadString(handler.Build())
 					Expect(err).NotTo(HaveOccurred())
 					p.Sort()
 					Expect(p).To(Equal(expectedProperties))
@@ -407,7 +407,7 @@ var _ = Describe("Platform properties", func() {
 				func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
 					handler, err := NewAppPropertyHandler(wf, plfm)
 					Expect(err).NotTo(HaveOccurred())
-					p, err := properties.LoadString(handler.BuildImmutableProperties())
+					p, err := properties.LoadString(handler.Build())
 					Expect(err).NotTo(HaveOccurred())
 					p.Sort()
 					Expect(p).To(Equal(expectedProperties))
@@ -453,7 +453,7 @@ var _ = Describe("Platform properties", func() {
 			DescribeTable("both Data Index and Job Services are available and", func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
 				handler, err := NewAppPropertyHandler(wf, plfm)
 				Expect(err).NotTo(HaveOccurred())
-				p, err := properties.LoadString(handler.BuildImmutableProperties())
+				p, err := properties.LoadString(handler.Build())
 				Expect(err).NotTo(HaveOccurred())
 				p.Sort()
 				Expect(p).To(Equal(expectedProperties))

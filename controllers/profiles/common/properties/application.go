@@ -60,7 +60,7 @@ var (
 type AppPropertyHandler interface {
 	WithUserProperties(userProperties string) AppPropertyHandler
 	WithServiceDiscovery(ctx context.Context, catalog discovery.ServiceCatalog) AppPropertyHandler
-	BuildImmutableProperties() string
+	Build() string
 }
 
 type appPropertyHandler struct {
@@ -83,7 +83,7 @@ func (a *appPropertyHandler) WithServiceDiscovery(ctx context.Context, catalog d
 	return a
 }
 
-func (a *appPropertyHandler) BuildImmutableProperties() string {
+func (a *appPropertyHandler) Build() string {
 	var userProps *properties.Properties
 	var propErr error = nil
 	if len(a.userProperties) == 0 {
@@ -186,7 +186,7 @@ func ImmutableApplicationProperties(workflow *operatorapi.SonataFlow, platform *
 	if err != nil {
 		return "", err
 	}
-	return p.BuildImmutableProperties(), nil
+	return p.Build(), nil
 
 }
 
