@@ -53,7 +53,7 @@ type serviceAppPropertyHandler struct {
 
 type ServiceAppPropertyHandler interface {
 	WithUserProperties(userProperties string) ServiceAppPropertyHandler
-	BuildImmutableProperties() string
+	Build() string
 }
 
 // NewServiceAppPropertyHandler creates the default service configurations property handler
@@ -74,7 +74,7 @@ func (a *serviceAppPropertyHandler) WithUserProperties(userProperties string) Se
 	return a
 }
 
-func (a *serviceAppPropertyHandler) BuildImmutableProperties() string {
+func (a *serviceAppPropertyHandler) Build() string {
 	var props *properties.Properties
 	var propErr error = nil
 	if len(a.userProperties) == 0 {

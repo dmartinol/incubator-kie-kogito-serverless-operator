@@ -253,7 +253,7 @@ func createConfigMap(ctx context.Context, client client.Client, platform *operat
 			Labels:    lbl,
 		},
 		Data: map[string]string{
-			workflowproj.ApplicationPropertiesFileName: handler.BuildImmutableProperties(),
+			workflowproj.ApplicationPropertiesFileName: handler.Build(),
 		},
 	}
 	if err := controllerutil.SetControllerReference(platform, configMap, client.Scheme()); err != nil {
@@ -262,7 +262,7 @@ func createConfigMap(ctx context.Context, client client.Client, platform *operat
 
 	// Create or Update the service
 	if op, err := controllerutil.CreateOrUpdate(ctx, client, configMap, func() error {
-		configMap.Data[workflowproj.ApplicationPropertiesFileName] = handler.WithUserProperties(configMap.Data[workflowproj.ApplicationPropertiesFileName]).BuildImmutableProperties()
+		configMap.Data[workflowproj.ApplicationPropertiesFileName] = handler.WithUserProperties(configMap.Data[workflowproj.ApplicationPropertiesFileName]).Build()
 
 		return nil
 	}); err != nil {
